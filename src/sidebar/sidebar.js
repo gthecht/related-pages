@@ -83,9 +83,24 @@ function updateRelatedLinks(message) {
             tryFaviconSources(favicon, link.url);
             
             // Clean up the title by removing any numeric prefixes
-            const displayTitle = link.title || link.url;
+            // Try to get a readable title, falling back to hostname if needed
+            let displayTitle;
+            if (link.title) {
+                displayTitle = link.title;
+            } else {
+                try {
+                    const urlObj = new URL(link.url);
+                    displayTitle = urlObj.hostname.replace(/^www\./, '');
+                    if (urlObj.pathname !== '/') {
+                        displayTitle += urlObj.pathname;
+                    }
+                } catch (e) {
+                    displayTitle = link.url;
+                }
+            }
             const titleSpan = document.createElement('span');
             titleSpan.textContent = displayTitle.replace(/^\d+\s*-\s*/, '').trim();
+            titleSpan.title = link.url; // Show full URL on hover
             
             a.appendChild(favicon);
             a.appendChild(titleSpan);

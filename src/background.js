@@ -12,7 +12,7 @@ let removedRelationships = new Set();
 
 // Constants for weight calculation and cleanup
 const WEIGHT_DECAY_FACTOR = 0.9; // How much older relationships decay
-const MIN_TRANSITION_TIME = 2000; // Minimum time (ms) to consider a valid transition
+const MIN_TRANSITION_TIME = 5000; // Minimum time (ms) to consider a valid transition
 const MIN_WEIGHT_THRESHOLD = 0.1; // Minimum weight to keep relationship
 const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Run cleanup daily
 
@@ -170,7 +170,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       });
       // Also store URL -> title mapping
       pageHistory.set(changeInfo.url, {
-        title: tab.title || changeInfo.url,
+        title: tab.title || null,
       });
     }
   }

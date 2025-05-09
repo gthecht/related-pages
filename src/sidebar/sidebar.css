@@ -1,5 +1,6 @@
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
     margin: 0;
     padding: 10px;
     background-color: #f9f9fa;
@@ -44,6 +45,7 @@ h2 {
     list-style: none;
     padding: 0;
     margin: 0;
+    font-size: 0.7rem;
 }
 
 .related-links li {
@@ -52,6 +54,7 @@ h2 {
     background-color: white;
     border: 1px solid #eee;
     border-radius: 4px;
+    font-size: 0.7rem;
 }
 
 .related-links li:hover {
@@ -129,7 +132,7 @@ h2 {
     right: 0;
     background-color: #fff;
     padding: 16px;
-    box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
     text-align: center;
 }
 
