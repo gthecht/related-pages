@@ -72,6 +72,23 @@ initializePageHistory();
 // Listen for tab activation
 browser.tabs.onActivated.addListener(async (activeInfo) => {
   console.log("Tab activated:", activeInfo.tabId);
+  
+  // Get previous and current tab info
+  const currentTab = await browser.tabs.get(activeInfo.tabId);
+  const previousTabId = currentActiveTabId;
+  
+  if (previousTabId) {
+    try {
+      const previousTab = await browser.tabs.get(previousTabId);
+      // Add relationship between previous and current tab
+      if (previousTab && currentTab && isValidUrl(previousTab.url) && isValidUrl(currentTab.url)) {
+        addRelationship(currentTab.url, previousTab.url);
+      }
+    } catch (e) {
+      console.log("Previous tab may have been closed");
+    }
+  }
+  
   currentActiveTabId = activeInfo.tabId;
   await updateSidebar(activeInfo.tabId);
 });
@@ -100,15 +117,19 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Update relationships when new pages are opened
-browser.tabs.onCreated.addListener((tab) => {
+browser.tabs.onCreated.addListener(async (tab) => {
   if (tab.openerTabId) {
     const openerInfo = pageHistory.get(tab.openerTabId);
-    if (openerInfo) {
+    if (openerInfo && openerInfo.url) {
+      const openerTab = await browser.tabs.get(tab.openerTabId);
       pageHistory.set(tab.id, {
         url: tab.url,
-        previousUrl: openerInfo.url
+        previousUrl: openerInfo.url,
+        title: tab.title || tab.url
       });
-      addRelationship(tab.url, openerInfo.url);
+      if (isValidUrl(tab.url) && isValidUrl(openerInfo.url)) {
+        addRelationship(tab.url, openerInfo.url);
+      }
     }
   }
 });
