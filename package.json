@@ -1,11 +1,16 @@
 {
-  "name": "related-tabs-manager",
+  "name": "related-tabs-graph",
   "version": "1.0.0",
-  "description": "Firefox extension for managing related tabs",
+  "description": "Firefox extension for tracking related tabs",
+  "license": "ISC",
+  "author": "giladh",
+  "type": "commonjs",
   "scripts": {
-    "postinstall": "cp node_modules/web-ext-icon/icon* src/icons/"
+    "start": "web-ext run --source-dir src/",
+    "build": "web-ext build --source-dir src/",
+    "lint": "web-ext lint --source-dir src/"
   },
-  "dependencies": {
-    "web-ext-icon": "^1.0.0"
+  "devDependencies": {
+    "web-ext": "^7.12.0"
   }
 }
