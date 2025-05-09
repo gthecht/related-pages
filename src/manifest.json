@@ -1,8 +1,8 @@
 {
     "manifest_version": 2,
-    "name": "Related Tabs Graph",
+    "name": "Related Pages",
     "version": "1.0.0",
-    "description": "Track and visualize relationships between browser tabs",
+    "description": "Track and visualize relationships between web pages",
     "permissions": [
         "tabs",
         "storage",
@@ -12,7 +12,7 @@
         "scripts": ["background.js"]
     },
     "sidebar_action": {
-        "default_title": "Related Tabs",
+        "default_title": "Related Pages",
         "default_panel": "sidebar/sidebar.html",
         "default_icon": "icons/icon-32.png",
         "browser_style": true

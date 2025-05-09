@@ -47,7 +47,7 @@ function updateRelatedLinks(links) {
         a.textContent = link.title || link.url;
         a.addEventListener('click', (e) => {
             e.preventDefault();
-            browser.tabs.create({ url: link.url });
+            browser.tabs.update({ url: link.url });
         });
         li.appendChild(a);
         linksList.appendChild(li);
