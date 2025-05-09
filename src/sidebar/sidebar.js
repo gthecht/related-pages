@@ -41,16 +41,20 @@ function updateRelatedLinks(links) {
     }
 
     links.forEach(link => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = link.url;
-        a.textContent = link.title || link.url;
-        a.addEventListener('click', (e) => {
-            e.preventDefault();
-            browser.tabs.update({ url: link.url });
-        });
-        li.appendChild(a);
-        linksList.appendChild(li);
+        if (typeof link === 'object' && link.url) {  // Ensure we have a valid link object
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = link.url;
+            // Clean up the title by removing any numeric prefixes
+            const displayTitle = link.title || link.url;
+            a.textContent = displayTitle.replace(/^\d+\s*-\s*/, '').trim();
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                browser.tabs.update({ url: link.url });
+            });
+            li.appendChild(a);
+            linksList.appendChild(li);
+        }
     });
 }
 

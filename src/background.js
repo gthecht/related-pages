@@ -1,20 +1,32 @@
 console.log("Background script loaded");
 
-// Store for tracking page relationships
+// Store for tracking page relationships with weights
 let pageRelationships = new Map();
 let currentActiveTabId = null;
 
-// Store for tracking navigation history with titles
+// Store for tracking navigation history with titles and timestamps
 let pageHistory = new Map();
+
+// Constants for weight calculation
+const WEIGHT_DECAY_FACTOR = 0.9; // How much older relationships decay
+const MIN_TRANSITION_TIME = 2000; // Minimum time (ms) to consider a valid transition
 
 // Load stored relationships
 async function loadStoredData() {
   const data = await browser.storage.local.get('pageRelationships');
   if (data.pageRelationships) {
-    // Convert stored object back to Map
+    // Convert stored object back to Map with weights
     const relationships = new Map();
     Object.entries(data.pageRelationships).forEach(([key, value]) => {
-      relationships.set(key, new Set(value));
+      const weightedSet = new Map();
+      Object.entries(value).forEach(([url, data]) => {
+        weightedSet.set(url, {
+          weight: data.weight,
+          lastAccessed: data.lastAccessed,
+          count: data.count
+        });
+      });
+      relationships.set(key, weightedSet);
     });
     pageRelationships = relationships;
     console.log('Loaded stored relationships:', pageRelationships);
@@ -26,7 +38,15 @@ async function saveRelationships() {
   // Convert Map to object for storage
   const relationshipsObj = {};
   pageRelationships.forEach((value, key) => {
-    relationshipsObj[key] = Array.from(value);
+    const weightedObj = {};
+    value.forEach((data, url) => {
+      weightedObj[url] = {
+        weight: data.weight,
+        lastAccessed: data.lastAccessed,
+        count: data.count
+      };
+    });
+    relationshipsObj[key] = weightedObj;
   });
   
   await browser.storage.local.set({
@@ -104,6 +124,20 @@ function isValidUrl(url) {
   }
 }
 
+// Update the weight of a relationship between two URLs
+function updateRelationshipWeight(fromUrl, toUrl, timestamp) {
+  if (!pageRelationships.has(fromUrl)) {
+    pageRelationships.set(fromUrl, new Map());
+  }
+  const relations = pageRelationships.get(fromUrl);
+  const existing = relations.get(toUrl);
+  relations.set(toUrl, {
+    weight: (existing?.weight || 0) * WEIGHT_DECAY_FACTOR + 1,
+    lastAccessed: timestamp,
+    count: (existing?.count || 0) + 1
+  });
+}
+
 // Add a relationship between two URLs
 function addRelationship(sourceUrl, targetUrl) {
   // Skip invalid or internal URLs
@@ -112,17 +146,16 @@ function addRelationship(sourceUrl, targetUrl) {
     return;
   }
 
-  // Add source -> target relationship
-  if (!pageRelationships.has(sourceUrl)) {
-    pageRelationships.set(sourceUrl, new Set());
+  const now = Date.now();
+  const sourceInfo = pageHistory.get(sourceUrl) || {};
+  
+  // Skip if transition was too quick (likely accidental)
+  if (sourceInfo.lastAccessed && (now - sourceInfo.lastAccessed < MIN_TRANSITION_TIME)) {
+    return;
   }
-  pageRelationships.get(sourceUrl).add(targetUrl);
 
-  // Add target -> source relationship
-  if (!pageRelationships.has(targetUrl)) {
-    pageRelationships.set(targetUrl, new Set());
-  }
-  pageRelationships.get(targetUrl).add(sourceUrl);
+  updateRelationshipWeight(sourceUrl, targetUrl, now);
+  updateRelationshipWeight(targetUrl, sourceUrl, now);
 
   console.log(
     `Added relationship between URLs ${sourceUrl} <-> ${targetUrl}`,
@@ -149,7 +182,9 @@ async function updateSidebar(tabId) {
     console.log("Current relationships:", pageRelationships);
 
     if (pageRelationships.has(currentUrl)) {
-      const relatedUrls = Array.from(pageRelationships.get(currentUrl));
+      const relatedUrls = Array.from(pageRelationships.get(currentUrl).entries())
+        .sort((a, b) => b[1].weight - a[1].weight)
+        .map(([url]) => url);
       console.log("Related URLs found:", relatedUrls);
       
       // Find tabs with related URLs
