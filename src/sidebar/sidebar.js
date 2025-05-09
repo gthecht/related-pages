@@ -45,9 +45,27 @@ function updateRelatedLinks(links) {
             const li = document.createElement('li');
             const a = document.createElement('a');
             a.href = link.url;
+            
+            // Add favicon
+            const favicon = document.createElement('img');
+            favicon.className = 'favicon';
+            try {
+                const urlObj = new URL(link.url);
+                favicon.src = `${urlObj.origin}/favicon.ico`;
+            } catch (e) {
+                favicon.src = 'chrome://favicon/size/16@1x/' + link.url;
+            }
+            favicon.onerror = () => {
+                favicon.src = 'chrome://favicon/size/16@1x/' + link.url;
+            };
+            
             // Clean up the title by removing any numeric prefixes
             const displayTitle = link.title || link.url;
-            a.textContent = displayTitle.replace(/^\d+\s*-\s*/, '').trim();
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = displayTitle.replace(/^\d+\s*-\s*/, '').trim();
+            
+            a.appendChild(favicon);
+            a.appendChild(titleSpan);
             a.addEventListener('click', (e) => {
                 e.preventDefault();
                 browser.tabs.update({ url: link.url });
@@ -64,17 +82,12 @@ const searchResults = document.getElementById('searchResults');
 
 searchInput.addEventListener('input', (e) => {
     const searchTerm = e.target.value.toLowerCase();
-    searchResults.innerHTML = '';
+    const links = document.querySelectorAll('#relatedLinks li');
     
-    if (searchTerm) {
-        const links = document.querySelectorAll('#relatedLinks li');
-        links.forEach(link => {
-            const text = link.textContent.toLowerCase();
-            if (text.includes(searchTerm)) {
-                searchResults.appendChild(link.cloneNode(true));
-            }
-        });
-    }
+    links.forEach(link => {
+        const text = link.textContent.toLowerCase();
+        link.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
 });
 
 // Clear history functionality
