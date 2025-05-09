@@ -72,3 +72,24 @@ searchInput.addEventListener('input', (e) => {
         });
     }
 });
+
+// Clear history functionality
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+const confirmationBanner = document.getElementById('confirmationBanner');
+const confirmClearBtn = document.getElementById('confirmClear');
+const cancelClearBtn = document.getElementById('cancelClear');
+
+clearHistoryBtn.addEventListener('click', () => {
+    confirmationBanner.classList.remove('hidden');
+});
+
+cancelClearBtn.addEventListener('click', () => {
+    confirmationBanner.classList.add('hidden');
+});
+
+confirmClearBtn.addEventListener('click', async () => {
+    await browser.runtime.sendMessage({ type: 'clearHistory' });
+    confirmationBanner.classList.add('hidden');
+    // Refresh the sidebar
+    browser.runtime.sendMessage({ type: 'getRelatedTabs' });
+});

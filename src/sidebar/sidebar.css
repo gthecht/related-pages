@@ -62,3 +62,60 @@ h3 {
 .related-links a:hover {
     text-decoration: underline;
 }
+
+.clear-history-container {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.clear-history-btn {
+    background-color: #d70022;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.clear-history-btn:hover {
+    background-color: #b1001c;
+}
+
+.confirmation-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    padding: 16px;
+    box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.confirmation-banner.hidden {
+    display: none;
+}
+
+.banner-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.banner-buttons button {
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#confirmClear {
+    background-color: #d70022;
+    color: white;
+    border: none;
+}
+
+#cancelClear {
+    background-color: #efefef;
+    border: 1px solid #ccc;
+}

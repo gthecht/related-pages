@@ -228,5 +228,13 @@ browser.runtime.onMessage.addListener((message, sender) => {
         });
     });
   }
+  if (message.type === "clearHistory") {
+    return new Promise((resolve) => {
+      pageRelationships.clear();
+      pageHistory.clear();
+      saveRelationships();
+      resolve({ success: true });
+    });
+  }
   return true;
 });
