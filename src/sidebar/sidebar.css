@@ -67,6 +67,31 @@ h2 {
     text-overflow: ellipsis;
     white-space: nowrap;
     gap: 8px;
+    flex-grow: 1;
+}
+
+.related-links li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.remove-link {
+    background: none;
+    border: none;
+    color: #d70022;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.related-links li:hover .remove-link {
+    opacity: 1;
+}
+
+.remove-link:hover {
+    color: #b1001c;
 }
 
 .related-links a:hover {
