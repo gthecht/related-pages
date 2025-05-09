@@ -1,0 +1,33 @@
+# Firefox Extension specific
+web-ext-artifacts/
+*.xpi
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Aider specific
+.aider*
+.aider.chat.history.md
+.aider.tags.cache.json
+
+# Build and temporary files
+dist/
+build/
+tmp/
+*.tmp
+*.bak
+
+# Logs and debugging
+*.log
+debug/

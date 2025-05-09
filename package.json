@@ -1,0 +1,11 @@
+{
+  "name": "related-tabs-manager",
+  "version": "1.0.0",
+  "description": "Firefox extension for managing related tabs",
+  "scripts": {
+    "postinstall": "cp node_modules/web-ext-icon/icon* src/icons/"
+  },
+  "dependencies": {
+    "web-ext-icon": "^1.0.0"
+  }
+}
