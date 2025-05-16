@@ -4,16 +4,11 @@ console.log("Background script loaded");
 let pageInfo = new Map(); // Maps URL -> { title, lastAccessed, favicon, relationships: Map<URL, {weight, count}> }
 let currentActiveTabId = null;
 
-
-
 // Store for tracking navigation history
 let pageHistory = new Map();
 
-// Constants for weight calculation and cleanup
-const WEIGHT_DECAY_FACTOR = 0.9; // How much older relationships decay
-const MIN_TRANSITION_TIME = 5000; // Minimum time (ms) to consider a valid transition
-const MIN_WEIGHT_THRESHOLD = 0.1; // Minimum weight to keep relationship
-const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // Run cleanup daily
+// Import configuration from central config file
+import { CONFIG } from "./config/config.js";
 
 let lastCleanupTime = 0;
 
@@ -37,7 +32,7 @@ async function loadStoredData() {
         Object.entries(data.relationships).forEach(([relatedUrl, relData]) => {
           relationships.set(relatedUrl, {
             weight: relData.weight,
-            count: relData.count
+            count: relData.count,
           });
         });
       }
@@ -45,7 +40,7 @@ async function loadStoredData() {
         title: data.title || url,
         lastAccessed: data.lastAccessed || Date.now(),
         favicon: data.favicon,
-        relationships: relationships
+        relationships: relationships,
       });
     });
     pageInfo = info;
@@ -58,7 +53,7 @@ function cleanupRelationships() {
   const now = Date.now();
 
   // Only run cleanup once per CLEANUP_INTERVAL
-  if (now - lastCleanupTime < CLEANUP_INTERVAL) {
+  if (now - lastCleanupTime < CONFIG.timing.cleanupInterval) {
     return;
   }
 
@@ -70,7 +65,7 @@ function cleanupRelationships() {
     const relations = info.relationships;
     for (const [relatedUrl, data] of relations.entries()) {
       // Remove if weight is too low
-      if (data.weight < MIN_WEIGHT_THRESHOLD) {
+      if (data.weight < CONFIG.weights.minimum) {
         relations.delete(relatedUrl);
         removedCount++;
         console.log(
@@ -100,21 +95,20 @@ async function saveRelationships() {
     info.relationships.forEach((data, relatedUrl) => {
       relationshipsObj[relatedUrl] = {
         weight: data.weight,
-        count: data.count
+        count: data.count,
       };
     });
     pageInfoObj[url] = {
       title: info.title,
       lastAccessed: info.lastAccessed,
       favicon: info.favicon,
-      relationships: relationshipsObj
+      relationships: relationshipsObj,
     };
   });
 
   await browser.storage.local.set({
     pageInfo: pageInfoObj,
     lastCleanupTime: lastCleanupTime,
-
   });
   console.log("Saved relationships and cleanup time to storage");
 }
@@ -164,11 +158,12 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
 
 // Check if a string looks like a URL
 function looksLikeUrl(str) {
-  return str && (
-    str.includes('://') || 
-    str.includes('/') ||
-    str.startsWith('www.') ||
-    /\.[a-z]{2,}$/i.test(str)
+  return (
+    str &&
+    (str.includes("://") ||
+      str.includes("/") ||
+      str.startsWith("www.") ||
+      /\.[a-z]{2,}$/i.test(str))
   );
 }
 
@@ -185,22 +180,25 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (isValidUrl(changeInfo.url)) {
       pageHistory.set(tabId, {
         url: changeInfo.url,
-        previousUrl: pageInfo.url
+        previousUrl: pageInfo.url,
       });
-        
+
       // Update centralized page info
-      const existingInfo = pageInfo.get(changeInfo.url) || { relationships: new Map() };
+      const existingInfo = pageInfo.get(changeInfo.url) || {
+        relationships: new Map(),
+      };
       // Don't overwrite title if it's not a URL-like string
       const currentTitle = existingInfo.title;
-      const shouldKeepTitle = currentTitle && 
+      const shouldKeepTitle =
+        currentTitle &&
         !looksLikeUrl(currentTitle) &&
-        currentTitle !== 'undefined';
-      
+        currentTitle !== "undefined";
+
       pageInfo.set(changeInfo.url, {
         ...existingInfo,
-        title: shouldKeepTitle ? currentTitle : (tab.title || changeInfo.url),
+        title: shouldKeepTitle ? currentTitle : tab.title || changeInfo.url,
         lastAccessed: Date.now(),
-        favicon: tab.favIconUrl
+        favicon: tab.favIconUrl,
       });
     }
   }
@@ -211,16 +209,17 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       const existingInfo = pageInfo.get(url) || { relationships: new Map() };
       // Only update title if current one looks like a URL or is missing
       const currentTitle = existingInfo.title;
-      const shouldUpdateTitle = !currentTitle || 
+      const shouldUpdateTitle =
+        !currentTitle ||
         looksLikeUrl(currentTitle) ||
-        currentTitle === 'undefined' ||
+        currentTitle === "undefined" ||
         currentTitle === url;
-      
+
       if (shouldUpdateTitle) {
         pageInfo.set(url, {
           ...existingInfo,
           title: changeInfo.title,
-          lastAccessed: Date.now()
+          lastAccessed: Date.now(),
         });
         // Save the updated title
         saveRelationships();
@@ -281,14 +280,16 @@ function updateRelationshipWeight(fromUrl, toUrl, timestamp) {
     pageInfo.set(fromUrl, {
       title: fromUrl,
       lastAccessed: timestamp,
-      relationships: new Map()
+      relationships: new Map(),
     });
   }
   const info = pageInfo.get(fromUrl);
   const existing = info.relationships.get(toUrl);
   info.relationships.set(toUrl, {
-    weight: (existing?.weight || 0) * WEIGHT_DECAY_FACTOR + 1,
-    count: (existing?.count || 0) + 1
+    weight:
+      (existing?.weight || 0) * CONFIG.weights.decayFactor +
+      CONFIG.weights.initial,
+    count: (existing?.count || 0) + 1,
   });
   info.lastAccessed = timestamp;
 }
@@ -296,8 +297,15 @@ function updateRelationshipWeight(fromUrl, toUrl, timestamp) {
 // Add a relationship between two URLs
 function addRelationship(sourceUrl, targetUrl) {
   // Skip invalid, internal, or identical URLs
-  if (!isValidUrl(sourceUrl) || !isValidUrl(targetUrl) || sourceUrl === targetUrl) {
-    console.log("Skipping invalid or self-referential URLs:", { sourceUrl, targetUrl });
+  if (
+    !isValidUrl(sourceUrl) ||
+    !isValidUrl(targetUrl) ||
+    sourceUrl === targetUrl
+  ) {
+    console.log("Skipping invalid or self-referential URLs:", {
+      sourceUrl,
+      targetUrl,
+    });
     return;
   }
 
@@ -307,12 +315,10 @@ function addRelationship(sourceUrl, targetUrl) {
   // Skip if transition was too quick (likely accidental)
   if (
     sourceInfo.lastAccessed &&
-    now - sourceInfo.lastAccessed < MIN_TRANSITION_TIME
+    now - sourceInfo.lastAccessed < CONFIG.timing.minTransition
   ) {
     return;
   }
-
-
 
   updateRelationshipWeight(sourceUrl, targetUrl, now);
   updateRelationshipWeight(targetUrl, sourceUrl, now);
@@ -341,9 +347,7 @@ async function updateSidebar(tabId) {
 
     if (pageInfo.has(currentUrl)) {
       const currentPageInfo = pageInfo.get(currentUrl);
-      const relatedUrls = Array.from(
-          currentPageInfo.relationships.entries()
-      )
+      const relatedUrls = Array.from(currentPageInfo.relationships.entries())
         .filter(([url]) => url !== currentUrl) // Filter out self-references
         .sort((a, b) => b[1].weight - a[1].weight)
         .map(([url]) => url);
@@ -365,7 +369,7 @@ async function updateSidebar(tabId) {
             relatedTabs.push({
               url: relatedUrl,
               title: storedInfo.title,
-              favicon: storedInfo.favicon
+              favicon: storedInfo.favicon,
             });
           } else {
             // Fallback to generating a title from the URL

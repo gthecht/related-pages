@@ -1,5 +1,5 @@
-// Maximum number of pages to show when not filtering
-const MAX_DEFAULT_PAGES = 5;
+// Import configuration from central config file
+import { CONFIG } from '../config/config.js';
 
 console.log('Sidebar script loaded');
 
@@ -234,7 +234,7 @@ function updateRelatedLinks(message) {
         updateLinksList(filteredPages);
     } else {
         // When not searching, show only the most relevant pages
-        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+        updateLinksList(allRelatedPages.slice(0, CONFIG.display.maxDefaultPages));
     }
     if (searchTerm) {
         const filteredPages = allRelatedPages.filter(page => 
@@ -244,7 +244,7 @@ function updateRelatedLinks(message) {
         updateLinksList(filteredPages);
     } else {
         // When not searching, show only the most relevant pages
-        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+        updateLinksList(allRelatedPages.slice(0, CONFIG.display.maxDefaultPages));
     }
 }
 
@@ -260,7 +260,7 @@ searchInput.addEventListener('input', (e) => {
         updateLinksList(filteredPages);
     } else {
         // When not searching, show only top relevant pages
-        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+        updateLinksList(allRelatedPages.slice(0, CONFIG.display.maxDefaultPages));
     }
 });
 
