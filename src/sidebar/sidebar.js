@@ -173,9 +173,21 @@ function updateRelatedLinks(message) {
             
             a.appendChild(favicon);
             a.appendChild(titleSpan);
-            a.addEventListener('click', (e) => {
+            a.addEventListener('click', async (e) => {
                 e.preventDefault();
-                browser.tabs.update({ url: link.url });
+                // Get all tabs and find one with matching URL
+                const allTabs = await browser.tabs.query({});
+                const matchingTab = allTabs.find(tab => tab.url === link.url);
+                
+                if (matchingTab) {
+                    // If found, switch to that tab
+                    await browser.tabs.update(matchingTab.id, { active: true });
+                    // If the tab is in a different window, focus that window too
+                    await browser.windows.update(matchingTab.windowId, { focused: true });
+                } else {
+                    // If no existing tab, create a new one
+                    await browser.tabs.create({ url: link.url });
+                }
             });
             // Add remove button
             const removeBtn = document.createElement('button');
