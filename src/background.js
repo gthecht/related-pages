@@ -4,8 +4,7 @@ console.log("Background script loaded");
 let pageInfo = new Map(); // Maps URL -> { title, lastAccessed, favicon, relationships: Map<URL, {weight, count}> }
 let currentActiveTabId = null;
 
-// Store for manually removed relationships
-let removedRelationships = new Set();
+
 
 // Store for tracking navigation history
 let pageHistory = new Map();
@@ -28,9 +27,7 @@ async function loadStoredData() {
   if (data.lastCleanupTime) {
     lastCleanupTime = data.lastCleanupTime;
   }
-  if (data.removedRelationships) {
-    removedRelationships = new Set(data.removedRelationships);
-  }
+
   if (data.pageInfo) {
     // Convert stored object back to Map with all page information
     const info = new Map();
@@ -117,7 +114,7 @@ async function saveRelationships() {
   await browser.storage.local.set({
     pageInfo: pageInfoObj,
     lastCleanupTime: lastCleanupTime,
-    removedRelationships: Array.from(removedRelationships),
+
   });
   console.log("Saved relationships and cleanup time to storage");
 }
@@ -315,11 +312,7 @@ function addRelationship(sourceUrl, targetUrl) {
     return;
   }
 
-  // Skip if relationship was manually removed
-  const relationshipKey = JSON.stringify([sourceUrl, targetUrl].sort());
-  if (removedRelationships.has(relationshipKey)) {
-    return;
-  }
+
 
   updateRelationshipWeight(sourceUrl, targetUrl, now);
   updateRelationshipWeight(targetUrl, sourceUrl, now);
@@ -443,7 +436,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     return new Promise((resolve) => {
       pageInfo.clear();
       pageHistory.clear();
-      removedRelationships.clear();
+
       saveRelationships();
       resolve({ success: true });
     });
@@ -451,15 +444,22 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "removeRelationship") {
     return new Promise((resolve) => {
       const { sourceUrl, targetUrl } = message;
-      // Add both directions to removed set
-      removedRelationships.add(JSON.stringify([sourceUrl, targetUrl].sort()));
-
-      // Remove from current relationships
+      // Set weight to 0 for both directions
       if (pageInfo.has(sourceUrl)) {
-        pageInfo.get(sourceUrl).relationships.delete(targetUrl);
+        const info = pageInfo.get(sourceUrl);
+        if (!info.relationships.has(targetUrl)) {
+          info.relationships.set(targetUrl, { count: 0, weight: 0 });
+        } else {
+          info.relationships.get(targetUrl).weight = 0;
+        }
       }
       if (pageInfo.has(targetUrl)) {
-        pageInfo.get(targetUrl).relationships.delete(sourceUrl);
+        const info = pageInfo.get(targetUrl);
+        if (!info.relationships.has(sourceUrl)) {
+          info.relationships.set(sourceUrl, { count: 0, weight: 0 });
+        } else {
+          info.relationships.get(sourceUrl).weight = 0;
+        }
       }
 
       saveRelationships();
