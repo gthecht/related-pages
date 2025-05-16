@@ -1,3 +1,6 @@
+// Maximum number of pages to show when not filtering
+const MAX_DEFAULT_PAGES = 5;
+
 console.log('Sidebar script loaded');
 
 // Request initial related tabs when sidebar loads
@@ -34,14 +37,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 let currentUrl = '';
 
 // Update the sidebar with related links
-function updateRelatedLinks(message) {
-    currentUrl = message.url;
-    if (!message || !message.links) {
-        console.error('Invalid message received:', message);
-        return;
-    }
-    const links = message.links;
-    console.log('Received links update:', message);
+function updateLinksList(links) {
     const linksList = document.getElementById('relatedLinks');
     if (!linksList) {
         console.error('Related links element not found');
@@ -215,14 +211,57 @@ function updateRelatedLinks(message) {
 const searchInput = document.getElementById('searchInput');
 const searchResults = document.getElementById('searchResults');
 
+let allRelatedPages = []; // Store all pages for filtering
+
+// Update function to store all pages
+function updateRelatedLinks(message) {
+    currentUrl = message.url;
+    if (!message || !message.links) {
+        console.error('Invalid message received:', message);
+        return;
+    }
+        
+    // Store all pages for filtering
+    allRelatedPages = message.links;
+        
+    // Update the UI with either all matching pages (if searching) or limited pages (if not)
+    const searchTerm = searchInput.value.toLowerCase();
+    if (searchTerm) {
+        const filteredPages = allRelatedPages.filter(page => 
+            (page.title || '').toLowerCase().includes(searchTerm) ||
+            page.url.toLowerCase().includes(searchTerm)
+        );
+        updateLinksList(filteredPages);
+    } else {
+        // When not searching, show only the most relevant pages
+        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+    }
+    if (searchTerm) {
+        const filteredPages = allRelatedPages.filter(page => 
+            (page.title || '').toLowerCase().includes(searchTerm) ||
+            page.url.toLowerCase().includes(searchTerm)
+        );
+        updateLinksList(filteredPages);
+    } else {
+        // When not searching, show only the most relevant pages
+        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+    }
+}
+
+// Handle search input
 searchInput.addEventListener('input', (e) => {
     const searchTerm = e.target.value.toLowerCase();
-    const links = document.querySelectorAll('#relatedLinks li');
-    
-    links.forEach(link => {
-        const text = link.textContent.toLowerCase();
-        link.style.display = text.includes(searchTerm) ? '' : 'none';
-    });
+    if (searchTerm) {
+        // When searching, show all matches
+        const filteredPages = allRelatedPages.filter(page => 
+            (page.title || '').toLowerCase().includes(searchTerm) ||
+            page.url.toLowerCase().includes(searchTerm)
+        );
+        updateLinksList(filteredPages);
+    } else {
+        // When not searching, show only top relevant pages
+        updateLinksList(allRelatedPages.slice(0, MAX_DEFAULT_PAGES));
+    }
 });
 
 // Clear history functionality

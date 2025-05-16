@@ -349,7 +349,7 @@ async function updateSidebar(tabId) {
     if (pageInfo.has(currentUrl)) {
       const currentPageInfo = pageInfo.get(currentUrl);
       const relatedUrls = Array.from(
-        currentPageInfo.relationships.entries()
+          currentPageInfo.relationships.entries()
       )
         .filter(([url]) => url !== currentUrl) // Filter out self-references
         .sort((a, b) => b[1].weight - a[1].weight)
