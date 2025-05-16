@@ -10,12 +10,14 @@ document.addEventListener('DOMContentLoaded', () => {
         type: 'getRelatedTabs'
     }).then(response => {
         if (!response || !response.success) {
-            throw new Error(response?.error || 'Failed to get related tabs');
+            console.warn('Failed to get related tabs:', response?.error);
+            linksList.innerHTML = '<li class="empty-state">No related tabs yet - start browsing!</li>';
+        } else {
+            console.log('Successfully requested related tabs');
         }
-        console.log('Successfully requested related tabs');
     }).catch(error => {
         console.error('Error requesting related tabs:', error);
-        linksList.innerHTML = '<li>Error loading tabs</li>';
+        linksList.innerHTML = '<li class="error-state">Error loading tabs</li>';
     });
 });
 
@@ -34,14 +36,23 @@ let currentUrl = '';
 // Update the sidebar with related links
 function updateRelatedLinks(message) {
     currentUrl = message.url;
+    if (!message || !message.links) {
+        console.error('Invalid message received:', message);
+        return;
+    }
     const links = message.links;
     console.log('Received links update:', message);
     const linksList = document.getElementById('relatedLinks');
+    if (!linksList) {
+        console.error('Related links element not found');
+        return;
+    }
     linksList.innerHTML = '';
 
     if (!Array.isArray(links) || links.length === 0) {
         const li = document.createElement('li');
-        li.textContent = 'No related tabs found';
+        li.className = 'empty-state';
+        li.textContent = 'No related tabs for this page yet';
         linksList.appendChild(li);
         return;
     }
@@ -56,31 +67,36 @@ function updateRelatedLinks(message) {
             const favicon = document.createElement('img');
             favicon.className = 'favicon';
             
-            // Try different favicon sources
-            const tryFaviconSources = async (favicon, url) => {
-                const sources = [
-                    `${new URL(url).origin}/favicon.ico`,
-                    `${new URL(url).origin}/favicon.png`,
-                    `${new URL(url).origin}/apple-touch-icon.png`,
-                    'chrome://favicon/size/16@1x/' + url,
-                    'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23ccc" width="100" height="100"/></svg>'
-                ];
-                
-                for (const source of sources) {
-                    try {
-                        await new Promise((resolve, reject) => {
-                            favicon.onload = resolve;
-                            favicon.onerror = reject;
-                            favicon.src = source;
-                        });
-                        return; // If successful, exit
-                    } catch (e) {
-                        continue; // Try next source
+            // Set favicon from stored info or try fallback sources
+            if (link.favicon) {
+                favicon.src = link.favicon;
+            } else {
+                // Try different favicon sources
+                const tryFaviconSources = async (favicon, url) => {
+                    const sources = [
+                        `${new URL(url).origin}/favicon.ico`,
+                        `${new URL(url).origin}/favicon.png`,
+                        `${new URL(url).origin}/apple-touch-icon.png`,
+                        'chrome://favicon/size/16@1x/' + url,
+                        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23ccc" width="100" height="100"/></svg>'
+                    ];
+                    
+                    for (const source of sources) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                favicon.onload = resolve;
+                                favicon.onerror = reject;
+                                favicon.src = source;
+                            });
+                            return; // If successful, exit
+                        } catch (e) {
+                            continue; // Try next source
+                        }
                     }
-                }
-            };
-            
-            tryFaviconSources(favicon, link.url);
+                };
+                
+                tryFaviconSources(favicon, link.url);
+            }
             
             // Clean up the title by removing any numeric prefixes
             // Try to get a readable title, falling back to hostname if needed

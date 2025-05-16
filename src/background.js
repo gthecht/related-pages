@@ -1,14 +1,14 @@
 console.log("Background script loaded");
 
-// Store for tracking page relationships with weights
-let pageRelationships = new Map();
+// Centralized store for page information including titles, relationships and metadata
+let pageInfo = new Map(); // Maps URL -> { title, lastAccessed, favicon, relationships: Map<URL, {weight, count}> }
 let currentActiveTabId = null;
-
-// Store for tracking navigation history with titles and timestamps
-let pageHistory = new Map();
 
 // Store for manually removed relationships
 let removedRelationships = new Set();
+
+// Store for tracking navigation history
+let pageHistory = new Map();
 
 // Constants for weight calculation and cleanup
 const WEIGHT_DECAY_FACTOR = 0.9; // How much older relationships decay
@@ -21,7 +21,7 @@ let lastCleanupTime = 0;
 // Load stored relationships and cleanup time
 async function loadStoredData() {
   const data = await browser.storage.local.get([
-    "pageRelationships",
+    "pageInfo",
     "lastCleanupTime",
     "removedRelationships",
   ]);
@@ -31,22 +31,28 @@ async function loadStoredData() {
   if (data.removedRelationships) {
     removedRelationships = new Set(data.removedRelationships);
   }
-  if (data.pageRelationships) {
-    // Convert stored object back to Map with weights
-    const relationships = new Map();
-    Object.entries(data.pageRelationships).forEach(([key, value]) => {
-      const weightedSet = new Map();
-      Object.entries(value).forEach(([url, data]) => {
-        weightedSet.set(url, {
-          weight: data.weight,
-          lastAccessed: data.lastAccessed,
-          count: data.count,
+  if (data.pageInfo) {
+    // Convert stored object back to Map with all page information
+    const info = new Map();
+    Object.entries(data.pageInfo).forEach(([url, data]) => {
+      const relationships = new Map();
+      if (data.relationships) {
+        Object.entries(data.relationships).forEach(([relatedUrl, relData]) => {
+          relationships.set(relatedUrl, {
+            weight: relData.weight,
+            count: relData.count
+          });
         });
+      }
+      info.set(url, {
+        title: data.title || url,
+        lastAccessed: data.lastAccessed || Date.now(),
+        favicon: data.favicon,
+        relationships: relationships
       });
-      relationships.set(key, weightedSet);
     });
-    pageRelationships = relationships;
-    console.log("Loaded stored relationships:", pageRelationships);
+    pageInfo = info;
+    console.log("Loaded stored page info:", pageInfo);
   }
 }
 
@@ -59,10 +65,12 @@ function cleanupRelationships() {
     return;
   }
 
+  // Clean up old and weak relationships
   lastCleanupTime = now;
   console.log("Running relationship cleanup...");
   let removedCount = 0;
-  for (const [url, relations] of pageRelationships.entries()) {
+  for (const [url, info] of pageInfo.entries()) {
+    const relations = info.relationships;
     for (const [relatedUrl, data] of relations.entries()) {
       // Remove if weight is too low
       if (data.weight < MIN_WEIGHT_THRESHOLD) {
@@ -73,10 +81,10 @@ function cleanupRelationships() {
         );
       }
     }
-    // Remove empty relation sets
+    // Remove pages with no relationships
     if (relations.size === 0) {
-      pageRelationships.delete(url);
-      console.log(`Removed empty relationship set for: ${url}`);
+      pageInfo.delete(url);
+      console.log(`Removed page with no relationships: ${url}`);
     }
   }
 
@@ -89,21 +97,25 @@ function cleanupRelationships() {
 async function saveRelationships() {
   cleanupRelationships();
   // Convert Map to object for storage
-  const relationshipsObj = {};
-  pageRelationships.forEach((value, key) => {
-    const weightedObj = {};
-    value.forEach((data, url) => {
-      weightedObj[url] = {
+  const pageInfoObj = {};
+  pageInfo.forEach((info, url) => {
+    const relationshipsObj = {};
+    info.relationships.forEach((data, relatedUrl) => {
+      relationshipsObj[relatedUrl] = {
         weight: data.weight,
-        lastAccessed: data.lastAccessed,
-        count: data.count,
+        count: data.count
       };
     });
-    relationshipsObj[key] = weightedObj;
+    pageInfoObj[url] = {
+      title: info.title,
+      lastAccessed: info.lastAccessed,
+      favicon: info.favicon,
+      relationships: relationshipsObj
+    };
   });
 
   await browser.storage.local.set({
-    pageRelationships: relationshipsObj,
+    pageInfo: pageInfoObj,
     lastCleanupTime: lastCleanupTime,
     removedRelationships: Array.from(removedRelationships),
   });
@@ -161,16 +173,20 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       // Only create relationship if previous page was valid
       addRelationship(changeInfo.url, pageInfo.url);
     }
-    // Store valid URLs with their titles
+    // Store valid URLs with their info
     if (isValidUrl(changeInfo.url)) {
       pageHistory.set(tabId, {
         url: changeInfo.url,
-        previousUrl: pageInfo.url,
-        title: tab.title || changeInfo.url,
+        previousUrl: pageInfo.url
       });
-      // Also store URL -> title mapping
-      pageHistory.set(changeInfo.url, {
-        title: tab.title || null,
+        
+      // Update centralized page info
+      const existingInfo = pageInfo.get(changeInfo.url) || { relationships: new Map() };
+      pageInfo.set(changeInfo.url, {
+        ...existingInfo,
+        title: tab.title || changeInfo.url,
+        lastAccessed: Date.now(),
+        favicon: tab.favIconUrl
       });
     }
   }
@@ -224,16 +240,20 @@ function isValidUrl(url) {
 
 // Update the weight of a relationship between two URLs
 function updateRelationshipWeight(fromUrl, toUrl, timestamp) {
-  if (!pageRelationships.has(fromUrl)) {
-    pageRelationships.set(fromUrl, new Map());
+  if (!pageInfo.has(fromUrl)) {
+    pageInfo.set(fromUrl, {
+      title: fromUrl,
+      lastAccessed: timestamp,
+      relationships: new Map()
+    });
   }
-  const relations = pageRelationships.get(fromUrl);
-  const existing = relations.get(toUrl);
-  relations.set(toUrl, {
+  const info = pageInfo.get(fromUrl);
+  const existing = info.relationships.get(toUrl);
+  info.relationships.set(toUrl, {
     weight: (existing?.weight || 0) * WEIGHT_DECAY_FACTOR + 1,
-    lastAccessed: timestamp,
-    count: (existing?.count || 0) + 1,
+    count: (existing?.count || 0) + 1
   });
+  info.lastAccessed = timestamp;
 }
 
 // Add a relationship between two URLs
@@ -284,11 +304,12 @@ async function updateSidebar(tabId) {
     const currentTab = await browser.tabs.get(tabId);
     const currentUrl = currentTab.url;
     console.log("Current URL:", currentUrl);
-    console.log("Current relationships:", pageRelationships);
+    console.log("Current page info:", pageInfo);
 
-    if (pageRelationships.has(currentUrl)) {
+    if (pageInfo.has(currentUrl)) {
+      const currentPageInfo = pageInfo.get(currentUrl);
       const relatedUrls = Array.from(
-        pageRelationships.get(currentUrl).entries(),
+        currentPageInfo.relationships.entries()
       )
         .filter(([url]) => url !== currentUrl) // Filter out self-references
         .sort((a, b) => b[1].weight - a[1].weight)
@@ -305,12 +326,13 @@ async function updateSidebar(tabId) {
             title: matchingTab.title,
           });
         } else {
-          // For URLs not currently open in a tab, try to use stored title or generate one
-          const storedPage = pageHistory.get(relatedUrl);
-          if (storedPage && storedPage.title) {
+          // For URLs not currently open in a tab, use stored info or generate title
+          const storedInfo = pageInfo.get(relatedUrl);
+          if (storedInfo && storedInfo.title) {
             relatedTabs.push({
               url: relatedUrl,
-              title: storedPage.title,
+              title: storedInfo.title,
+              favicon: storedInfo.favicon
             });
           } else {
             // Fallback to generating a title from the URL
@@ -379,8 +401,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
   if (message.type === "clearHistory") {
     return new Promise((resolve) => {
-      pageRelationships.clear();
+      pageInfo.clear();
       pageHistory.clear();
+      removedRelationships.clear();
       saveRelationships();
       resolve({ success: true });
     });
@@ -392,11 +415,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
       removedRelationships.add(JSON.stringify([sourceUrl, targetUrl].sort()));
 
       // Remove from current relationships
-      if (pageRelationships.has(sourceUrl)) {
-        pageRelationships.get(sourceUrl).delete(targetUrl);
+      if (pageInfo.has(sourceUrl)) {
+        pageInfo.get(sourceUrl).relationships.delete(targetUrl);
       }
-      if (pageRelationships.has(targetUrl)) {
-        pageRelationships.get(targetUrl).delete(sourceUrl);
+      if (pageInfo.has(targetUrl)) {
+        pageInfo.get(targetUrl).relationships.delete(sourceUrl);
       }
 
       saveRelationships();
