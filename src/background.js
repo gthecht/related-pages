@@ -165,8 +165,19 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
   await updateSidebar(activeInfo.tabId);
 });
 
+// Check if a string looks like a URL
+function looksLikeUrl(str) {
+  return str && (
+    str.includes('://') || 
+    str.includes('/') ||
+    str.startsWith('www.') ||
+    /\.[a-z]{2,}$/i.test(str)
+  );
+}
+
 // Listen for tab updates
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Handle URL changes
   if (changeInfo.url) {
     const pageInfo = pageHistory.get(tabId) || { url: null, previousUrl: null };
     if (pageInfo.url && isValidUrl(pageInfo.url)) {
@@ -182,12 +193,41 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         
       // Update centralized page info
       const existingInfo = pageInfo.get(changeInfo.url) || { relationships: new Map() };
+      // Don't overwrite title if it's not a URL-like string
+      const currentTitle = existingInfo.title;
+      const shouldKeepTitle = currentTitle && 
+        !looksLikeUrl(currentTitle) &&
+        currentTitle !== 'undefined';
+      
       pageInfo.set(changeInfo.url, {
         ...existingInfo,
-        title: tab.title || changeInfo.url,
+        title: shouldKeepTitle ? currentTitle : (tab.title || changeInfo.url),
         lastAccessed: Date.now(),
         favicon: tab.favIconUrl
       });
+    }
+  }
+  // Handle title changes
+  else if (changeInfo.title && tab.url) {
+    const url = tab.url;
+    if (isValidUrl(url)) {
+      const existingInfo = pageInfo.get(url) || { relationships: new Map() };
+      // Only update title if current one looks like a URL or is missing
+      const currentTitle = existingInfo.title;
+      const shouldUpdateTitle = !currentTitle || 
+        looksLikeUrl(currentTitle) ||
+        currentTitle === 'undefined' ||
+        currentTitle === url;
+      
+      if (shouldUpdateTitle) {
+        pageInfo.set(url, {
+          ...existingInfo,
+          title: changeInfo.title,
+          lastAccessed: Date.now()
+        });
+        // Save the updated title
+        saveRelationships();
+      }
     }
   }
 });
@@ -258,9 +298,9 @@ function updateRelationshipWeight(fromUrl, toUrl, timestamp) {
 
 // Add a relationship between two URLs
 function addRelationship(sourceUrl, targetUrl) {
-  // Skip invalid or internal URLs
-  if (!isValidUrl(sourceUrl) || !isValidUrl(targetUrl)) {
-    console.log("Skipping invalid URLs:", { sourceUrl, targetUrl });
+  // Skip invalid, internal, or identical URLs
+  if (!isValidUrl(sourceUrl) || !isValidUrl(targetUrl) || sourceUrl === targetUrl) {
+    console.log("Skipping invalid or self-referential URLs:", { sourceUrl, targetUrl });
     return;
   }
 

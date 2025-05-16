@@ -98,20 +98,73 @@ function updateRelatedLinks(message) {
                 tryFaviconSources(favicon, link.url);
             }
             
-            // Clean up the title by removing any numeric prefixes
-            // Try to get a readable title, falling back to hostname if needed
+            // Function to format a path segment into a readable title
+            const formatPathSegment = (segment) => {
+                try {
+                    return decodeURIComponent(segment)
+                        .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+                        .replace(/\.\w+$/, '') // Remove file extensions
+                        .replace(/^\d+[.-]/, '') // Remove leading numbers and separators
+                        .replace(/[A-F0-9]{8}(?:[A-F0-9]{4}){3}[A-F0-9]{12}/i, '') // Remove GUIDs
+                        .replace(/\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b/, '') // Remove dates
+                        .trim()
+                        .split(' ')
+                        .filter(Boolean)
+                        .join(' ');
+                } catch (e) {
+                    return segment;
+                }
+            };
+
+            // Generate display title
             let displayTitle;
-            if (link.title) {
+            if (link.title && !link.title.includes('://') && !link.title.includes('/') && !link.title.startsWith('www.')) {
+                // Use existing title if it doesn't look like a URL
                 displayTitle = link.title;
             } else {
                 try {
                     const urlObj = new URL(link.url);
-                    displayTitle = urlObj.hostname.replace(/^www\./, '');
-                    if (urlObj.pathname !== '/') {
-                        displayTitle += urlObj.pathname;
+                    const pathParts = urlObj.pathname.split('/').filter(Boolean);
+                    
+                    if (pathParts.length > 0) {
+                        // Take up to last 3 meaningful segments
+                        const significantParts = pathParts
+                            .slice(-3)
+                            .map(formatPathSegment)
+                            .filter(part => part.length > 0);
+                            
+                        // If we have a fragment, add it to the parts
+                        if (urlObj.hash) {
+                            const fragment = formatPathSegment(urlObj.hash.substring(1)); // Remove the leading #
+                            if (fragment) {
+                                significantParts.push(fragment);
+                            }
+                        }
+                            
+                        // If we have meaningful path parts, use them
+                        if (significantParts.length > 0) {
+                            displayTitle = significantParts.join(' › ');
+                        } else {
+                            // Try to use query parameters if path parts aren't meaningful
+                            const params = new URLSearchParams(urlObj.search);
+                            const titleParams = ['title', 'name', 'q', 'query', 'id'];
+                            for (const param of titleParams) {
+                                const value = params.get(param);
+                                if (value) {
+                                    displayTitle = formatPathSegment(value);
+                                    break;
+                                }
+                            }
+                            // Fall back to hostname if no meaningful query params
+                            if (!displayTitle) {
+                                displayTitle = urlObj.hostname.replace(/^www\./, '');
+                            }
+                        }
+                    } else {
+                        displayTitle = urlObj.hostname.replace(/^www\./, '');
                     }
                 } catch (e) {
-                    displayTitle = link.url;
+                    displayTitle = link.title || link.url;
                 }
             }
             const titleSpan = document.createElement('span');
