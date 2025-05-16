@@ -169,6 +169,10 @@ function looksLikeUrl(str) {
 
 // Listen for tab updates
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // If page is completely loaded and there's relationships, update sidebar
+  if (changeInfo.status === 'complete' && tab.url && pageInfo.has(tab.url)) {
+    updateSidebar(tabId);
+  }
   // Handle URL changes
   if (changeInfo.url) {
     const pageInfo = pageHistory.get(tabId) || { url: null, previousUrl: null };
@@ -241,6 +245,7 @@ browser.tabs.onCreated.addListener(async (tab) => {
       });
       if (isValidUrl(tab.url) && isValidUrl(openerInfo.url)) {
         addRelationship(tab.url, openerInfo.url);
+        updateSidebar(tab.id);
       }
     }
   }
