@@ -453,21 +453,21 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "removeRelationship") {
     return new Promise((resolve) => {
       const { sourceUrl, targetUrl } = message;
-      // Set weight to 0 for both directions
+      // Delete relationship in both directions
       if (pageInfo.has(sourceUrl)) {
         const info = pageInfo.get(sourceUrl);
-        if (!info.relationships.has(targetUrl)) {
-          info.relationships.set(targetUrl, { count: 0, weight: 0 });
-        } else {
-          info.relationships.get(targetUrl).weight = 0;
+        info.relationships.delete(targetUrl);
+        // Remove page if it has no more relationships
+        if (info.relationships.size === 0) {
+          pageInfo.delete(sourceUrl);
         }
       }
       if (pageInfo.has(targetUrl)) {
         const info = pageInfo.get(targetUrl);
-        if (!info.relationships.has(sourceUrl)) {
-          info.relationships.set(sourceUrl, { count: 0, weight: 0 });
-        } else {
-          info.relationships.get(sourceUrl).weight = 0;
+        info.relationships.delete(sourceUrl);
+        // Remove page if it has no more relationships
+        if (info.relationships.size === 0) {
+          pageInfo.delete(targetUrl);
         }
       }
 
