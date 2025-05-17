@@ -1,6 +1,7 @@
 # Firefox Extension specific
 web-ext-artifacts/
 *.xpi
+*.zip
 
 # Node.js
 node_modules/
